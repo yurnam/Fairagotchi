@@ -3,9 +3,9 @@
 
 root_part_1=mmcblk1p1     # external sd partition 1
 root_part_2=mmcblk1p2     # external sd partition 2 
-root_part_3=mmcblk0p27    # internal userdata partition
-modules_part=mmcblk0p25   # cache partition  used for kernel modules
-firmware_part=mmcblk0p26  # hidden partition used for firmware
+root_part_3=mmcblk0p62    # internal userdata partition
+modules_part=mmcblk0p30   # system_a partition  used for kernel modules
+firmware_part=mmcblk0p31  # system_b partition used for firmware
 
 
 
