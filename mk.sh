@@ -4,8 +4,8 @@ set -euo pipefail
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
 
-DTB="qcom/msm8916-samsung-a5u-eur.dtb"
-defconfig="msm8916_defconfig"
+DTB="qcom/sdm632-fairphone-fp3.dts"
+defconfig="fp3.config"
 
 # Image sizes for make_ext4fs (-l)
 modules_size="100M"      # was dd count=100 bs=1M
