@@ -8,8 +8,8 @@ DTB="qcom/sdm632-fairphone-fp3.dts"
 defconfig="fp3.config"
 
 # Image sizes for make_ext4fs (-l)
-modules_size="100M"      # was dd count=100 bs=1M
-firmware_size="90M"
+modules_size="120M"      # was dd count=100 bs=1M
+firmware_size="120M"
 rootfs_size="10000M"     # (kept in case you use it later)
 
 VMLINUX_DIR="linux"
