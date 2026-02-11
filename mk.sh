@@ -4,7 +4,7 @@ set -euo pipefail
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
 
-DTB="qcom/sdm632-fairphone-fp3.dts"
+DTB="qcom/sdm632-fairphone-fp3.dtb"
 defconfig="fp3.config"
 
 # Image sizes for make_ext4fs (-l)
@@ -23,7 +23,7 @@ mkdir -p "${IMAGES_DIR}"
 cd "${VMLINUX_DIR}"
 
 if [ -f ".config" ]; then
-  make xconfig
+  echo ".config exists"
 else
   make "${defconfig}"
 fi
