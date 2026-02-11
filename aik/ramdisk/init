@@ -1,0 +1,146 @@
+#!/bin/sh
+
+
+root_part_1=mmcblk1p1     # external sd partition 1
+root_part_2=mmcblk1p2     # external sd partition 2 
+root_part_3=mmcblk0p27    # internal userdata partition
+modules_part=mmcblk0p25   # cache partition  used for kernel modules
+firmware_part=mmcblk0p26  # hidden partition used for firmware
+
+
+
+secs=5                    # seconds for initrd uart shell
+
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+/bin/busybox --install -s
+/bin/busybox-extras --install -s
+
+mount -t proc -o nodev,noexec,nosuid proc /proc
+mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
+mkdir /config
+mount -t configfs -o nodev,noexec,nosuid configfs /config
+mkdir -p /dev/pts
+mount -t devpts devpts /dev/pts
+mkdir /run
+
+
+
+mdev -s  
+
+
+mdev -s  
+sleep 2
+
+mdev -s  
+
+ln -s /proc/mounts /etc/mtab
+
+
+
+
+echo "repairing and resizing partitions"
+
+
+e2fsck -y -f /dev/$root_part_1   
+e2fsck -y -f /dev/$root_part_2   
+e2fsck -y -f /dev/$root_part_3   
+e2fsck -y -f /dev/$modules_part     
+e2fsck -y -f /dev/$firmware_part   
+
+
+resize2fs -p /dev/$root_part_1   
+resize2fs -p /dev/$root_part_2   
+resize2fs -p /dev/$root_part_3   
+resize2fs -p /dev/$modules_part     
+resize2fs -p /dev/$firmware_part   
+
+
+
+echo "trying to mount $root_part_1 on /sysroot"
+mount -t ext4 -o rw /dev/$root_part_1 /sysroot
+
+
+
+if ! [ -e /sysroot/usr ]; then
+	umount /sysroot	
+	echo "$root_part_1 retrying "
+	mdev -s  
+	mount -t ext4 -o rw /dev/$root_part_1 /sysroot
+fi
+
+
+if ! [ -e /sysroot/usr ]; then
+	umount /sysroot
+	echo "trying $root_part_2 "
+	mdev -s  
+	mount -t ext4 -o rw /dev/$root_part_2 /sysroot
+fi
+
+if ! [ -e /sysroot/usr ]; then
+	umount /sysroot	
+	echo "trying $root_part_3 "
+	mdev -s  
+	mount -t ext4 -o rw /dev/$root_part_3 /sysroot
+fi
+
+
+
+if ! [ -e /sysroot/usr ]; then
+	echo "Error no root partition found  or no OS installed exiting to initrd shell! "
+	/bin/sh
+fi
+
+
+# remove conflicting things
+rm -rf /sysroot/lib/modules
+rm -rf /sysroot/lib/firmware
+#rm -rf /sysroot/etc/fstab
+
+rm -rf /lib/modules
+rm -rf /lib/firmware
+
+
+
+# Mount modules and firmware partitions
+mkdir -p /sysroot/lib/modules
+mkdir -p /sysroot/lib/firmware
+
+sleep 1
+
+mount -t ext4 -o rw /dev/$modules_part /sysroot/lib/modules
+mount -t ext4 -o rw /dev/$firmware_part /sysroot/lib/firmware
+
+
+
+ln -s /sysroot/lib/modules /lib/
+ln -s /sysroot/lib/firmware /lib/
+
+depmod
+
+modprobe msm
+modprobe drm
+modprobe videodev
+modprobe mc
+
+
+
+mdev -s  
+mdev -s  
+sleep 2
+mdev -s  
+
+
+
+# Switch root
+killall mdev 
+umount /boot
+umount /proc
+umount /sys
+umount /dev/pts
+umount /dev
+
+
+exec switch_root /sysroot /sbin/init
+
+
+
