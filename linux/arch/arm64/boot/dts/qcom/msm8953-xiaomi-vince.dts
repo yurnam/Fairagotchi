@@ -1,0 +1,304 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2022, Eugene Lepshy <fekz115@gmail.com>
+ * Copyright (c) 2022, Gianluca Boiano <morf3089@gmail.com>
+ */
+/dts-v1/;
+
+#include "msm8953-xiaomi-common.dtsi"
+
+/delete-node/ &adsp_fw_mem;
+/delete-node/ &cont_splash_mem;
+/delete-node/ &qseecom_mem;
+/delete-node/ &wcnss_fw_mem;
+
+/ {
+	model = "Xiaomi Redmi 5 Plus";
+	compatible = "xiaomi,vince", "qcom,msm8953";
+	qcom,board-id = <0x1000b 0x08>;
+
+	gpio-keys {
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_hall_sensor_default>;
+
+		event-hall-sensor {
+			label = "Hall Effect Sensor";
+			gpios = <&tlmm 44 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_LID>;
+			linux,can-disable;
+		};
+	};
+
+	reserved-memory {
+		qseecom_mem: qseecom@84a00000 {
+			reg = <0x0 0x84a00000 0x0 0x1900000>;
+			no-map;
+		};
+
+		cont_splash_mem: cont-splash@90001000 {
+			reg = <0x0 0x90001000 0x0 (1080 * 2160 * 3)>;
+			no-map;
+		};
+
+		adsp_fw_mem: adsp@8d600000 {
+			reg = <0x0 0x8d600000 0x0 0x1200000>;
+			no-map;
+		};
+
+		wcnss_fw_mem: wcnss@8e800000 {
+			reg = <0x0 0x8e800000 0x0 0x700000>;
+			no-map;
+		};
+
+		ramoops@9ff00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x9ff00000 0x0 0x100000>;
+			record-size = <0x1000>;
+			console-size = <0x80000>;
+			ftrace-size = <0x1000>;
+			pmsg-size = <0x8000>;
+		};
+	};
+
+	/*
+	 * We bitbang on &i2c_4 because BLSP is protected by TZ as sensors are
+	 * normally proxied via ADSP firmware. GPIOs aren't protected.
+	 */
+	i2c-sensors {
+		compatible = "i2c-gpio";
+		sda-gpios = <&tlmm 14 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&tlmm 15 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>; /* ~100 kHz */
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		magnetometer@c {
+			compatible = "asahi-kasei,ak09918";
+			reg = <0x0c>;
+			vdd-supply = <&pm8953_l10>;
+			vid-supply = <&pm8953_l6>;
+			mount-matrix = "1", "0", "0",
+					"0", "1", "0",
+					"0", "0", "1";
+		};
+
+		light-sensor@53 {
+			compatible = "liteon,ltrf216a";
+			reg = <0x53>;
+			vdd-supply = <&pm8953_l10>;
+		};
+
+		imu@68 {
+			compatible = "bosch,bmi120";
+			reg = <0x68>;
+
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+
+			mount-matrix = "0", "-1", "0",
+					"-1", "0", "0",
+					"0", "0", "1";
+		};
+
+		imu@6a {
+			compatible = "st,lsm6dsl";
+			reg = <0x6a>;
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+			mount-matrix = "1", "0", "0",
+					"0", "-1", "0",
+					"0", "0", "1";
+		};
+	};
+};
+
+&aw2013_led {
+	status = "okay";
+};
+
+&battery {
+	charge-full-design-microamp-hours = <4000000>;
+	constant-charge-current-max-microamp = <2500000>;
+	voltage-min-design-microvolt = <3400000>;
+	voltage-max-design-microvolt = <4380000>;
+};
+
+&camss {
+	status = "okay";
+	vdda-supply = <&pm8953_s3>;
+
+	ports {
+		port@2 {
+			reg = <2>;
+			csiphy2_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1>;
+				remote-endpoint = <&front_cam_ep>;
+			};
+		};
+	};
+};
+
+&cci {
+	pinctrl-names = "default";
+	pinctrl-0 = <&cci0_default>,
+		    <&cci1_default>,
+		    <&camss_mclk0_default>,
+		    <&camss_mclk1_default>;
+
+	status = "okay";
+};
+
+&cci_i2c1 {
+	camera-sensor@36 { // Front camera
+		compatible = "ovti,ov5675";
+
+		reg = <0x36>;
+
+		clocks = <&gcc GCC_CAMSS_MCLK1_CLK>;
+
+		pinctrl-0 = <&cam_sensor_front_default>;
+		pinctrl-names = "default";
+
+		reset-gpios = <&tlmm 129 GPIO_ACTIVE_LOW>;
+
+		avdd-supply= <&pm8953_l22>;
+		dvdd-supply = <&pm8953_l23>;
+		dovdd-supply = <&pm8953_l6>;
+		orientation = <0>;
+		rotation = <90>;
+
+		status = "okay";
+
+		port {
+			front_cam_ep: endpoint {
+				data-lanes = <0 1>;
+				remote-endpoint = <&csiphy2_ep>;
+				link-frequencies = /bits/ 64 <450000000>;
+			};
+		};
+	};
+};
+
+&ibb {
+	/* xiaomi-vince's panel uses 5.7v instead of 5.5v */
+	regulator-min-microvolt = <5700000>;
+	regulator-max-microvolt = <5700000>;
+};
+
+&lab {
+	/* xiaomi-vince's panel uses 5.7v instead of 5.5v */
+	regulator-min-microvolt = <5700000>;
+	regulator-max-microvolt = <5700000>;
+};
+
+&i2c_3 {
+	touchscreen@1 {
+		compatible = "novatek,nt36672a-ts";
+		reg = <0x1>;
+
+		interrupts-extended = <&tlmm 65 IRQ_TYPE_EDGE_FALLING>;
+
+		iovcc-supply = <&pm8953_l6>;
+		vcc-supply = <&pm8953_l10>;
+
+		reset-gpios = <&tlmm 64 GPIO_ACTIVE_LOW>;
+
+		status = "disabled";
+	};
+};
+
+&panel {
+	compatible = "xiaomi,vince-panel";
+};
+
+&pm8953_l23 {
+	regulator-min-microvolt = <1200000>;
+};
+
+&pmi8950_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,brake-pattern = <0x3 0x3 0x0 0x0>;
+	qcom,wave-play-rate-us = <5263>;
+	qcom,wave-shape = <HAP_WAVE_SQUARE>;
+
+	status = "okay";
+};
+
+&pmi8950_wled {
+	qcom,external-pfet;
+	qcom,cabc;
+};
+
+&rmi4_ts {
+	status = "disabled";
+};
+
+&sound_card {
+	model = "xiaomi-vince";
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&cdc_pdm_lines_act
+		&cdc_pdm_lines_2_act
+		&cdc_pdm_comp_lines_act
+		&tlmm_pri_act>;
+	pinctrl-1 = <&cdc_pdm_lines_sus
+		&cdc_pdm_lines_2_sus
+		&cdc_pdm_comp_lines_sus
+		&tlmm_pri_sus>;
+
+	status = "okay";
+};
+
+&spi_6 {
+	status = "okay";
+};
+
+&tlmm {
+	gpio-reserved-ranges = <0 4>, <16 4>, <135 4>;
+
+	cam_sensor_front_default: cam_sensor_front_default {
+		pins = "gpio129";
+		function = "gpio";
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	gpio_hall_sensor_default: gpio-hall-sensor-state {
+		pins = "gpio44";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	tlmm_pri_act: pri-tlmm-state {
+		pins = "gpio88", "gpio91", "gpio93";
+		function = "pri_mi2s";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	tlmm_pri_sus: pri-tlmm-state {
+		pins = "gpio88", "gpio91", "gpio93";
+		function = "pri_mi2s";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+};
+
+&uart_0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart_console_active>;
+
+	status = "okay";
+};
+
+&wcd_codec {
+	qcom,mbhc-vthreshold-high = <91 259 488 488 488>;
+	qcom,mbhc-vthreshold-low = <91 259 488 488 488>;
+};
+
+&zap_shader {
+	firmware-name = "qcom/msm8953/xiaomi/vince/a506_zap.mdt";
+};

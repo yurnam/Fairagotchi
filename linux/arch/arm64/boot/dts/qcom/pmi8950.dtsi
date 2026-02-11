@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2019, AngeloGioacchino Del Regno <kholk11@gmail.com>
+
+#include <dt-bindings/iio/qcom,spmi-vadc.h>
+#include <dt-bindings/input/qcom,spmi-haptics.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/spmi/spmi.h>
+
+&spmi_bus {
+	pmic@2 {
+		compatible = "qcom,pmi8950", "qcom,spmi-pmic";
+		reg = <0x2 SPMI_USID>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pmi8950_vadc: adc@3100 {
+			compatible = "qcom,spmi-vadc";
+			reg = <0x3100>;
+			interrupts = <0x2 0x31 0x0 IRQ_TYPE_EDGE_RISING>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			#io-channel-cells = <1>;
+
+			channel@0 {
+				reg = <VADC_USBIN>;
+				qcom,pre-scaling = <1 20>;
+				label = "usbin";
+			};
+
+			channel@1 {
+				reg = <VADC_DCIN>;
+				qcom,pre-scaling = <1 20>;
+				label = "dcin";
+			};
+
+			channel@2 {
+				reg = <VADC_VCHG_SNS>;
+				qcom,pre-scaling = <1 3>;
+				label = "vchg_sns";
+			};
+
+			channel@9 {
+				reg = <VADC_REF_625MV>;
+				qcom,pre-scaling = <1 1>;
+				label = "ref_625mv";
+			};
+
+			channel@a {
+				reg = <VADC_REF_1250MV>;
+				qcom,pre-scaling = <1 1>;
+				label = "ref_1250mv";
+			};
+
+			channel@d {
+				reg = <VADC_SPARE2>;
+				qcom,pre-scaling = <1 1>;
+				label = "chg_temp";
+			};
+
+			channel@e {
+				reg = <VADC_GND_REF>;
+			};
+
+			channel@f {
+				reg = <VADC_VDD_VADC>;
+			};
+		};
+
+		pmi8950_mpps: mpps@a000 {
+			compatible = "qcom,pmi8950-mpp", "qcom,spmi-mpp";
+			reg = <0xa000>;
+			gpio-controller;
+			gpio-ranges = <&pmi8950_mpps 0 0 4>;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		pmi8950_gpios: gpio@c000 {
+			compatible = "qcom,pmi8950-gpio", "qcom,spmi-gpio";
+			reg = <0xc000>;
+			gpio-controller;
+			gpio-ranges = <&pmi8950_gpios 0 0 2>;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		pmi8950_smbcharger: smbchager@1000 {
+			compatible = "qcom,pmi8996-smbchg";
+			reg = <0x1000>;
+			interrupts = <2 0x10 0 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 1 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 2 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 3 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 4 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 5 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 6 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x10 7 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x11 0 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x11 1 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x11 3 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 0 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 1 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 2 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 3 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 4 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 5 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 6 IRQ_TYPE_EDGE_BOTH>,
+					<2 0x12 7 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x13 0x0 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x13 0x1 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x13 0x2 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x13 0x5 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x14 0x0 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x14 0x1 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x0 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x1 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x2 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x3 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x4 IRQ_TYPE_EDGE_BOTH>,
+					<0x2 0x16 0x5 IRQ_TYPE_EDGE_BOTH>;
+
+			interrupt-names = "chg-error",
+					"chg-inhibit",
+					"chg-prechg-sft",
+					"chg-complete-chg-sft",
+					"chg-p2f-thr",
+					"chg-rechg-thr",
+					"chg-taper-thr",
+					"chg-tcc-thr",
+					"otg-fail",
+					"otg-oc",
+					"usbid-change",
+					"batt-hot",
+					"batt-warm",
+					"batt-cold",
+					"batt-cool",
+					"batt-ov",
+					"batt-low",
+					"batt-missing",
+					"batt-term-missing",
+					"usbin-uv",
+					"usbin-ov",
+					"usbin-src-det",
+					"aicl-done",
+					"dcin-uv",
+					"dcin-ov",
+					"power-ok",
+					"temp-shutdown",
+					"wdog-timeout",
+					"flash-fail",
+					"otst2",
+					"otst3";
+			smbchg-lite;
+			status = "disabled";
+		};
+
+		pmi8950_fg: fuel-gauge@4000 {
+			compatible = "qcom,pmi8996-fg";
+			reg = <0x4000>;
+
+			interrupts = <0x2 0x40 0x4 IRQ_TYPE_EDGE_RISING>,
+				     <0x2 0x44 0x0 IRQ_TYPE_EDGE_BOTH>;
+			interrupt-names = "soc-delta", "mem-avail";
+
+			status = "okay";
+		};
+
+		atc_leds: leds@1243 {
+			reg = <0x1243>;
+			compatible = "qcom,leds-atc";
+			label = "charging";
+			status = "disabled";
+		};
+	};
+
+	pmic@3 {
+		compatible = "qcom,pmi8950", "qcom,spmi-pmic";
+		reg = <0x3 SPMI_USID>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		labibb {
+			compatible = "qcom,pmi8950-lab-ibb",
+				     "qcom,pmi8998-lab-ibb";
+
+			ibb: ibb {
+				interrupts = <0x3 0xdc 0x2 IRQ_TYPE_EDGE_RISING>,
+					     <0x3 0xdc 0x0 IRQ_TYPE_LEVEL_LOW>;
+				interrupt-names = "sc-err", "ocp";
+			};
+
+			lab: lab {
+				interrupts = <0x3 0xde 0x1 IRQ_TYPE_EDGE_RISING>,
+					     <0x3 0xde 0x0 IRQ_TYPE_LEVEL_LOW>;
+				interrupt-names = "sc-err", "ocp";
+			};
+		};
+
+		pmi8950_pwm: pwm {
+			compatible = "qcom,pmi8950-pwm";
+			#pwm-cells = <2>;
+
+			status = "disabled";
+		};
+
+		pmi8950_haptics: haptics@c000 {
+			compatible = "qcom,pmi8950-haptics", "qcom,spmi-haptics";
+			reg = <0xc000>;
+
+			interrupts = <0x3 0xc0 0x0 IRQ_TYPE_EDGE_BOTH>,
+				     <0x3 0xc0 0x1 IRQ_TYPE_EDGE_BOTH>;
+			interrupt-names = "short", "play";
+			qcom,play-mode = <HAP_PLAY_DIRECT>;
+
+			status = "disabled";
+		};
+
+		pmi8950_wled: leds@d800 {
+			compatible = "qcom,pmi8950-wled";
+			reg = <0xd800>, <0xd900>;
+			interrupts = <0x3 0xd8 0x1 IRQ_TYPE_EDGE_RISING>,
+				     <0x3 0xd8 0x2 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "ovp", "short";
+			label = "backlight";
+
+			status = "disabled";
+		};
+	};
+};

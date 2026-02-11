@@ -1,0 +1,288 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/dts-v1/;
+
+#include "msm8953-xiaomi-common.dtsi"
+#include "dt-bindings/pinctrl/qcom,pmic-gpio.h"
+
+/delete-node/ &cont_splash_mem;
+/delete-node/ &qseecom_mem;
+
+/ {
+	model = "Xiaomi Redmi Note 4X";
+	compatible = "xiaomi,mido", "qcom,msm8953";
+	qcom,board-id = <11 0>;
+
+	aliases {
+		mmc0 = &sdhc_1;
+		mmc1 = &sdhc_2;
+	};
+
+	speaker_amp: audio-amplifier {
+		compatible = "awinic,aw8738";
+		mode-gpios = <&tlmm 96 GPIO_ACTIVE_HIGH>;
+		awinic,mode = <5>;
+		sound-name-prefix = "Speaker Amp";
+	};
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer@90001000 {
+			compatible = "simple-framebuffer";
+			reg = <0 0x90001000 0 (1920 * 1080 * 3)>;
+
+			width = <1080>;
+			height = <1920>;
+			stride = <(1080 * 3)>;
+			format = "r8g8b8";
+
+			power-domains = <&gcc MDSS_GDSC>;
+
+			clocks = <&gcc GCC_MDSS_AHB_CLK>,
+				 <&gcc GCC_MDSS_AXI_CLK>,
+				 <&gcc GCC_MDSS_VSYNC_CLK>,
+				 <&gcc GCC_MDSS_MDP_CLK>,
+				 <&gcc GCC_MDSS_BYTE0_CLK>,
+				 <&gcc GCC_MDSS_PCLK0_CLK>,
+				 <&gcc GCC_MDSS_ESC0_CLK>;
+		};
+	};
+
+	/*
+	 * We bitbang on &i2c_4 because BLSP is protected by TZ as sensors are
+	 * normally proxied via ADSP firmware. GPIOs aren't protected.
+	 */
+	i2c-sensors {
+		compatible = "i2c-gpio";
+		sda-gpios = <&tlmm 14 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&tlmm 15 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>; /* ~100 kHz */
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		imu@68 {
+			compatible = "bosch,bmi160";
+			reg = <0x68>;
+
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+
+			mount-matrix = "0", "1", "0",
+					"1", "0", "0",
+					"0", "0", "1";
+		};
+
+		imu@6a {
+			compatible = "st,lsm6ds3";
+			reg = <0x6a>;
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+			mount-matrix = "-1", "0", "0",
+					"0", "1", "0",
+					"0", "0", "1";
+		};
+
+		light-sensor@53 {
+			/* it has ltr579 alps sensor */
+			compatible = "liteon,ltrf216a";
+			reg = <0x53>;
+			vdd-supply = <&pm8953_l10>;
+		};
+	};
+
+	irled {
+		compatible = "pwm-ir-tx";
+		pwms = <&pmi8950_pwm 0 0>;
+	};
+
+	reserved-memory {
+		qseecom_mem: qseecom@84a00000 {
+			reg = <0x0 0x84a00000 0x0 0x1900000>;
+			no-map;
+		};
+
+		cont_splash_mem: cont-splash@90001000 {
+			reg = <0x0 0x90001000 0x0 (1080 * 1920 * 3)>;
+			no-map;
+		};
+
+		ramoops@9ff00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x9ff00000 0x0 0x00100000>;
+			console-size = <0x100000>;
+		};
+	};
+};
+
+&aw2013_led {
+	status = "okay";
+
+	led@1 {
+		reg = <1>;
+		color = <LED_COLOR_ID_GREEN>;
+		function = LED_FUNCTION_INDICATOR;
+		led-max-microamp = <5000>;
+	};
+
+	led@2 {
+		reg = <2>;
+		color = <LED_COLOR_ID_BLUE>;
+		function = LED_FUNCTION_INDICATOR;
+		led-max-microamp = <5000>;
+	};
+};
+
+&battery {
+	charge-full-design-microamp-hours = <4100000>;
+	constant-charge-current-max-microamp = <1000000>;
+	voltage-min-design-microvolt = <3400000>;
+	voltage-max-design-microvolt = <4380000>;
+};
+
+&camss {
+	status = "okay";
+	vdda-supply = <&pm8953_s3>;
+
+	ports {
+		port@0 {
+			reg = <0>;
+			csiphy0_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&rear_cam_ep>;
+			};
+		};
+	};
+};
+
+&cci {
+	pinctrl-names = "default";
+	pinctrl-0 = <&cci0_default>,
+		    <&cci1_default>,
+		    <&camss_mclk0_default>,
+		    <&camss_mclk1_default>;
+
+	status = "okay";
+};
+
+&cci_i2c0 {
+	camera-sensor@10 { // Primary rear camera
+		compatible = "samsung,s5k3l8";
+
+		reg = <0x10>;
+
+		clocks = <&gcc GCC_CAMSS_MCLK0_CLK>;
+		clock-frequency = <24000000>;
+
+		reset-gpios = <&tlmm 40 GPIO_ACTIVE_LOW>;
+
+		avdd-supply= <&pm8953_l22>;
+		dvdd-supply = <&pm8953_l2>;
+		vio-supply = <&pm8953_l6>;
+		aux-supply = <&pm8953_l17>;
+
+		rotation = <270>;
+		orientation = <1>;
+
+		status = "okay";
+
+		port {
+			rear_cam_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
+		};
+	};
+};
+
+&ft5406_ts {
+	status = "disabled";
+
+	touchscreen-size-x = <1080>;
+	touchscreen-size-y = <1920>;
+};
+
+&gt917d_ts {
+	status = "disabled";
+
+	touchscreen-size-x = <1080>;
+	touchscreen-size-y = <1920>;
+};
+
+&panel {
+	compatible = "xiaomi,mido-panel";
+};
+
+&pmi8950_gpios {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm_ir_default>;
+
+	pwm_ir_default: pwm_ir_default {
+		pwm_ir_state {
+			pins = "gpio1";
+			output-low;
+			bias-pull-down;
+			function = "func1";
+			qcom,drive-strength = <PMIC_GPIO_STRENGTH_MED>;
+		};
+	};
+};
+
+&pmi8950_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,brake-pattern = <0x3 0x3 0x0 0x0>;
+	qcom,wave-play-rate-us = <5263>;
+	qcom,wave-shape = <HAP_WAVE_SQUARE>;
+
+	status = "okay";
+};
+
+&pmi8950_pwm {
+	status = "okay";
+};
+
+&pm8953_l2 {
+	regulator-min-microvolt = <1200000>;
+};
+
+&sdhc_2 {
+	cd-gpios = <&tlmm 133 GPIO_ACTIVE_LOW>;
+};
+
+&sound_card {
+
+	model = "xiaomi-mido";
+
+	aux-devs = <&speaker_amp>;
+	audio-routing =
+		"AMIC1", "MIC BIAS External1",
+		"AMIC2", "MIC BIAS Internal2",
+		"AMIC3", "MIC BIAS External1",
+		"MM_DL1", "MultiMedia1 Playback",
+		"MM_DL3", "MultiMedia3 Playback",
+		"MM_DL4", "MultiMedia4 Playback",
+		"MultiMedia2 Capture", "MM_UL2";
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&cdc_pdm_lines_act &cdc_pdm_lines_2_act &cdc_pdm_comp_lines_act>;
+	pinctrl-1 = <&cdc_pdm_lines_sus &cdc_pdm_lines_2_sus &cdc_pdm_comp_lines_sus>;
+
+	status = "okay";
+};
+
+&tlmm {
+	gpio-reserved-ranges = <0 4>, <135 4>;
+};
+
+&wcd_codec {
+	/delete-property/ qcom,gnd-jack-type-normally-open;
+	/delete-property/ qcom,hphl-jack-type-normally-open;
+	qcom,mbhc-vthreshold-high = <73 233 438 438 438>;
+	qcom,mbhc-vthreshold-low = <73 233 438 438 438>;
+};
+
+&zap_shader {
+	firmware-name = "qcom/msm8953/xiaomi/mido/a506_zap.mdt";
+};

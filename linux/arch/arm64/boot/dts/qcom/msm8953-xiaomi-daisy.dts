@@ -1,0 +1,309 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2022, Alejandro Tafalla
+ */
+/dts-v1/;
+
+#include "msm8953-xiaomi-common.dtsi"
+
+/delete-node/ &adsp_fw_mem;
+/delete-node/ &qseecom_mem;
+/delete-node/ &wcnss_fw_mem;
+
+/ {
+	model = "Xiaomi Mi A2 Lite";
+	compatible = "xiaomi,daisy", "qcom,msm8953";
+	qcom,board-id = <0x1000b 0x9>;
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer@90001000 {
+			compatible = "simple-framebuffer";
+			reg = <0 0x90001000 0 (1920 * 2280 * 3)>;
+
+			width = <1080>;
+			height = <2280>;
+			stride = <(1080 * 3)>;
+			format = "r8g8b8";
+
+			power-domains = <&gcc MDSS_GDSC>;
+
+			clocks = <&gcc GCC_MDSS_AHB_CLK>,
+				 <&gcc GCC_MDSS_AXI_CLK>,
+				 <&gcc GCC_MDSS_VSYNC_CLK>,
+				 <&gcc GCC_MDSS_MDP_CLK>,
+				 <&gcc GCC_MDSS_BYTE0_CLK>,
+				 <&gcc GCC_MDSS_PCLK0_CLK>,
+				 <&gcc GCC_MDSS_ESC0_CLK>;
+		};
+	};
+
+	reserved-memory {
+		qseecom_mem: qseecom@84a00000 {
+			reg = <0x0 0x84a00000 0x0 0x1900000>;
+			no-map;
+		};
+
+		adsp_fw_mem: adsp@8d600000 {
+			reg = <0x0 0x8d600000 0x0 0x1200000>;
+			no-map;
+		};
+
+		wcnss_fw_mem: wcnss@8e800000 {
+			reg = <0x0 0x8e800000 0x0 0x700000>;
+			no-map;
+		};
+
+		ramoops@9ff00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x9ff00000 0x0 0x00100000>;
+			console-size = <0x100000>;
+		};
+	};
+
+	/*
+	 * We bitbang on &i2c_4 because BLSP is protected by TZ as sensors are
+	 * normally proxied via ADSP firmware. GPIOs aren't protected.
+	 */
+	i2c-sensors {
+		compatible = "i2c-gpio";
+		sda-gpios = <&tlmm 14 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&tlmm 15 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>; /* ~100 kHz */
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		imu@68 {
+			compatible = "bosch,bmi160";
+			reg = <0x68>;
+
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+
+			mount-matrix = "0", "1", "0",
+					"-1", "0", "0",
+					"0", "0", "1";
+		};
+
+		imu@6a {
+			compatible = "st,lsm6dsl";
+			reg = <0x6a>;
+			vdd-supply = <&pm8953_l10>;
+			vddio-supply = <&pm8953_l6>;
+			mount-matrix = "-1", "0", "0",
+					"0", "-1", "0",
+					"0", "0", "1";
+		};
+
+		light-sensor@53 {
+			/* it has ltr579 alps sensor */
+			compatible = "liteon,ltrf216a";
+			reg = <0x53>;
+			vdd-supply = <&pm8953_l10>;
+		};
+	};
+
+	avdd_cam_front: vreg-cam-front-avdd {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg-cam-front-avdd";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&tlmm 62 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&pm8953_l22>;
+	};
+};
+
+&aw2013_led {
+	status = "okay";
+};
+
+&camss {
+	status = "okay";
+	vdda-supply = <&pm8953_s3>;
+
+	ports {
+		port@2 {
+			reg = <2>;
+			csiphy2_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1>;
+				remote-endpoint = <&front_cam_ep>;
+			};
+		};
+	};
+};
+
+&cci {
+	pinctrl-names = "default";
+	pinctrl-0 = <&cci0_default>,
+		    <&cci1_default>,
+		    <&camss_mclk0_default>,
+		    <&camss_mclk1_default>;
+
+	status = "okay";
+};
+
+&cci_i2c1 {
+	camera-sensor@36 { // Front camera
+		compatible = "ovti,ov5675";
+
+		reg = <0x36>;
+
+		clocks = <&gcc GCC_CAMSS_MCLK1_CLK>;
+
+		pinctrl-0 = <&cam_sensor_front_default>;
+		pinctrl-names = "default";
+
+		reset-gpios = <&tlmm 129 GPIO_ACTIVE_LOW>;
+
+		avdd-supply= <&avdd_cam_front>;
+		dvdd-supply = <&pm8953_l23>;
+		dovdd-supply = <&pm8953_l6>;
+		rotation = <270>;
+		orientation = <0>;
+
+		status = "okay";
+
+		port {
+			front_cam_ep: endpoint {
+				data-lanes = <0 1>;
+				remote-endpoint = <&csiphy2_ep>;
+				link-frequencies = /bits/ 64 <450000000>;
+			};
+		};
+	};
+};
+
+&max98927_codec {
+	status = "okay";
+
+	reset-gpios = <&tlmm 89 GPIO_ACTIVE_LOW>;
+};
+
+&ft5406_ts {
+	status = "disabled";
+
+	touchscreen-size-x = <1080>;
+	touchscreen-size-y = <2280>;
+};
+
+&gt917d_ts {
+	status = "disabled";
+
+	touchscreen-size-x = <1080>;
+	touchscreen-size-y = <2280>;
+};
+
+&panel {
+	compatible = "xiaomi,daisy-panel";
+};
+
+&pm8953_l23 {
+	regulator-min-microvolt = <1200000>;
+};
+
+&pmi8950_haptics {
+	qcom,actuator-type = <HAP_TYPE_ERM>;
+	qcom,brake-pattern = <0x3 0x3 0x0 0x0>;
+	qcom,wave-play-rate-us = <5263>;
+	qcom,wave-shape = <HAP_WAVE_SQUARE>;
+
+	status = "okay";
+};
+
+&pmi8950_wled {
+	qcom,num-strings = <3>;
+};
+
+&battery {
+	charge-full-design-microamp-hours = <4000000>;
+	constant-charge-current-max-microamp = <1000000>;
+	voltage-min-design-microvolt = <3400000>;
+	voltage-max-design-microvolt = <4400000>;
+};
+
+&sdhc_2 {
+	cd-gpios = <&tlmm 133 GPIO_ACTIVE_HIGH>;
+};
+
+&sound_card {
+	status = "okay";
+
+	model = "xiaomi-daisy";
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&cdc_pdm_lines_act
+			&cdc_pdm_lines_2_act
+			&cdc_pdm_comp_lines_act
+			&tlmm_pri_act
+			&tlmm_pri_ws_default>;
+	pinctrl-1 = <&cdc_pdm_lines_sus
+			&cdc_pdm_lines_2_sus
+			&cdc_pdm_comp_lines_sus
+			&tlmm_pri_sus
+			&tlmm_pri_ws_default>;
+
+	quinary-mi2s-dai-link {
+		link-name = "Quinary MI2S";
+		cpu {
+			sound-dai = <&q6afedai QUINARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&max98927_codec>;
+		};
+	};
+};
+
+&spi_6 {
+	status = "okay";
+};
+
+&tlmm {
+	gpio-reserved-ranges = <0 4>, <16 4>, <135 4>;
+
+	cam_sensor_front_default: cam_sensor_front_default {
+		pins = "gpio129";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	tlmm_pri_act: pri-tlmm-pins {
+		pins = "gpio88", "gpio91", "gpio93";
+		function = "pri_mi2s";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	tlmm_pri_sus: pri-tlmm-pins {
+		pins = "gpio88", "gpio91", "gpio93";
+		function = "pri_mi2s";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+};
+
+&uart_0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart_console_active>;
+
+	status = "okay";
+};
+
+&wcd_codec {
+	qcom,mbhc-vthreshold-high = <91 259 488 488 488>;
+	qcom,mbhc-vthreshold-low = <91 259 488 488 488>;
+};
+
+&zap_shader {
+	firmware-name = "qcom/msm8953/xiaomi/daisy/a506_zap.mdt";
+};
