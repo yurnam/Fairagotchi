@@ -1,1 +1,1 @@
-console=ttyMSM0,115200
+quiet console=ttyMSM0,115200 pmos_boot_uuid=3621a3e4-af5c-49a4-a51c-a92ea66e3d5a pmos_root_uuid=1d182e5d-e2c1-4ed7-b10b-5425b804a202 pmos_rootfsopts=defaults
