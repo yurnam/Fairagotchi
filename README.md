@@ -213,7 +213,7 @@ fastboot flash dtbo_a resources/dtbo.img
 fastboot flash dtbo_b resources/dtbo.img
 ```
 
-Or use the combined script (which should also include dtbo flashing):
+Or use the script (includes dtbo flashing):
 ```bash
 ./flash_lk2nd.sh
 ```
@@ -320,6 +320,8 @@ After you've successfully booted into Pwnagotchi and can SSH into the device, in
 
    ```bash
    find /home/pi -name "display.py" 2>/dev/null | grep pwnagotchi
+   # Or search more broadly if not found:
+   # sudo find / -path "*/pwnagotchi/ui/display.py" 2>/dev/null
    ```
 
    This will show you the path, typically something like:
