@@ -321,7 +321,7 @@ After you've successfully booted into Pwnagotchi and can SSH into the device, in
    ```bash
    find /home/pi -name "display.py" 2>/dev/null | grep pwnagotchi
    # Or search more broadly if not found:
-   # sudo find / -path "*/pwnagotchi/ui/display.py" 2>/dev/null
+   # sudo find / -name "display.py" 2>/dev/null | grep pwnagotchi
    ```
 
    This will show you the path, typically something like:
