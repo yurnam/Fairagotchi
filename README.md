@@ -168,8 +168,12 @@ The userdata partition on your Fairphone 3 will hold the Pwnagotchi root filesys
    # Find the rootfs partition offset
    fdisk -l pwnagotchi-raspios-lite-v1.5.5.img
    
-   # Mount the second partition (rootfs) - adjust offset as needed
-   # Typically starts at sector 532480, with 512 byte sectors = 272629760 bytes
+   # Look for the second partition (rootfs) in the output above
+   # Note the "Start" sector number (e.g., 532480)
+   # Calculate offset: start_sector × 512 = offset in bytes
+   # Example: 532480 × 512 = 272629760 bytes
+   
+   # Mount the rootfs partition - adjust offset based on your fdisk output
    mkdir -p /tmp/pwnagotchi-rootfs
    sudo mount -o loop,offset=272629760 pwnagotchi-raspios-lite-v1.5.5.img /tmp/pwnagotchi-rootfs
    ```
@@ -179,7 +183,12 @@ The userdata partition on your Fairphone 3 will hold the Pwnagotchi root filesys
    Copy the Fairagotchi-specific files to the rootfs:
 
    ```bash
+   # First, verify the Python version in your image
+   # Check the actual path - it may be python3.9, python3.11, etc.
+   ls /tmp/pwnagotchi-rootfs/usr/local/lib/
+   
    # Copy display plugin (replaces the original)
+   # Adjust python3.9 to match your Python version (e.g., python3.11)
    sudo cp plugins/display.py /tmp/pwnagotchi-rootfs/usr/local/lib/python3.9/dist-packages/pwnagotchi/plugins/default/display.py
    
    # Copy helper scripts
