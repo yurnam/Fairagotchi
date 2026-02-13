@@ -505,6 +505,9 @@ Block incoming connections to Pwnagotchi ports:
 # Install iptables if not present
 sudo apt-get install -y iptables iptables-persistent
 
+# These rules assume default OUTPUT policy is ACCEPT (allowing outbound connections)
+# Verify with: sudo iptables -L -v -n
+
 # IMPORTANT: Allow established connections first (responses to your outgoing requests)
 # Using modern 'conntrack' module instead of deprecated 'state' module
 sudo iptables -A INPUT -i wwan0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
@@ -522,6 +525,9 @@ sudo iptables -A INPUT -i wwan0 -p tcp --dport 8081 -j DROP
 
 # Save rules so they persist across reboots
 sudo netfilter-persistent save
+
+# Verify rules were saved and applied
+sudo iptables -L -v -n | grep wwan0
 ```
 
 Alternatively, configure Pwnagotchi to only listen on the USB interface (`usb0`) instead of all interfaces.
