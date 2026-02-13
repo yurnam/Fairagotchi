@@ -470,7 +470,7 @@ If you want to use the internal modem for internet connectivity:
    # sudo nmcli connection modify mobile gsm.password "your-password"
    ```
 
-   **Common APN examples:**
+   **Common APN examples** (verify with your carrier as these may change):
    - T-Mobile US: `fast.t-mobile.com`
    - AT&T US: `phone`
    - Verizon US: `vzwinternet`
@@ -512,7 +512,7 @@ sudo iptables -A INPUT -i wwan0 -p tcp --dport 8080 -j DROP
 sudo iptables -A INPUT -i wwan0 -p tcp --dport 8081 -j DROP
 
 # Allow established connections (responses to your outgoing requests)
-sudo iptables -A INPUT -i wwan0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+sudo iptables -A INPUT -i wwan0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # Optional: Block all other incoming connections on mobile interface
 # sudo iptables -A INPUT -i wwan0 -j DROP
