@@ -1,0 +1,15 @@
+[Unit]
+Description=Expose ModemManager GPS NMEA as fake /dev/ttyUSB device (mmcli -> PTY)
+After=dbus.service ModemManager.service
+Wants=ModemManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/mmcli-gps-tty.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+

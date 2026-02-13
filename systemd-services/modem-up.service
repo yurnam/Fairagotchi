@@ -1,0 +1,12 @@
+[Unit]
+Description=QMI SIM Provisioning
+After=rmtfs.service
+Before=ModemManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/qmi-provision.sh
+
+[Install]
+WantedBy=multi-user.target
+
