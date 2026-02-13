@@ -393,7 +393,7 @@ After you've successfully booted into Pwnagotchi and can SSH into the device, in
    AID="A0:00:00:00:87:10:02:FF:49:94:20:89:03:10:00:00"
    ```
 
-   This works for most SIM cards, but if your modem doesn't initialize correctly, you may need to find and use the correct AID for your SIM card. You can list available AIDs with:
+   This is a hexadecimal representation with bytes separated by colons. This value works for most SIM cards, but if your modem doesn't initialize correctly, you may need to find and use the correct AID for your SIM card. You can list available AIDs with:
 
    ```bash
    qmicli -d qrtr://0 --uim-get-card-status
@@ -506,6 +506,7 @@ Block incoming connections to Pwnagotchi ports:
 sudo apt-get install -y iptables iptables-persistent
 
 # IMPORTANT: Allow established connections first (responses to your outgoing requests)
+# Using modern 'conntrack' module instead of deprecated 'state' module
 sudo iptables -A INPUT -i wwan0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # Block incoming connections on Pwnagotchi web interface (port 8080)
@@ -515,6 +516,8 @@ sudo iptables -A INPUT -i wwan0 -p tcp --dport 8080 -j DROP
 sudo iptables -A INPUT -i wwan0 -p tcp --dport 8081 -j DROP
 
 # Optional: Block all other incoming connections on mobile interface
+# WARNING: This blocks ALL incoming traffic including ping responses
+# Only enable if you understand the implications
 # sudo iptables -A INPUT -i wwan0 -j DROP
 
 # Save rules so they persist across reboots
