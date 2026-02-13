@@ -15,7 +15,7 @@ https://wiki.postmarketos.org/wiki/Fairphone_3_(fairphone-fp3)
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [Building](#building)
-- [Preparing the Pwnagotchi Rootfs](#preparing-the-pwnagotchi-rootfs)
+- [Preparing the Pwnagotchi SD Card](#preparing-the-pwnagotchi-sd-card)
 - [Flashing to Fairphone 3](#flashing-to-fairphone-3)
 - [Post-Installation Configuration](#post-installation-configuration)
 - [Using with Other ARM64 Linux Distributions](#using-with-other-arm64-linux-distributions)
@@ -54,9 +54,10 @@ The goal is to create a fully portable pentesting platform powered by a smartpho
 
 ### Hardware Requirements
 
-- **Fairphone 3** (or Fairphone 3+)
-- **USB-OTG cable** and **USB Wi-Fi adapter** with monitor mode support (e.g., ALFA AWUS036ACH, TP-Link TL-WN722N v1)
-- **microSD card** (16GB minimum) with Pwnagotchi Raspberry Pi image
+- **Fairphone 3** (or Fairphone 3+) running Android 13 or later (update to latest official ROM before unlocking bootloader)
+- **USB-OTG cable** and **RTL8821CU based USB Wi-Fi adapter** (recommended: EP119 - firmware included in this project)
+- **microSD card** (16GB minimum) with Pwnagotchi Raspberry Pi image pre-flashed
+- **USB to Ethernet adapter** for initial setup and SSH access
 - **USB cable** for fastboot connection to computer
 - **SIM card** (optional, required for GPS functionality)
 
@@ -145,11 +146,11 @@ You should see:
 
 ---
 
-## Preparing the Pwnagotchi Rootfs
+## Preparing the Pwnagotchi SD Card
 
-The userdata partition on your Fairphone 3 will hold the Pwnagotchi root filesystem from a Raspberry Pi SD card image.
+Simply use a standard Pwnagotchi Raspberry Pi SD card image. No need to extract or modify the root filesystem - just flash it to a microSD card and insert it into the Fairphone 3.
 
-### Option 1: Using a Standard Pwnagotchi Raspberry Pi SD Card Image (Recommended)
+### Steps
 
 1. **Download Pwnagotchi Image**
    
@@ -157,99 +158,25 @@ The userdata partition on your Fairphone 3 will hold the Pwnagotchi root filesys
    - Official releases: https://github.com/evilsocket/pwnagotchi/releases
    - Or use a custom build with your preferred configuration
 
-2. **Extract the Root Filesystem**
+2. **Flash to SD Card**
 
+   Use your preferred tool to flash the image to a microSD card:
+   
    ```bash
-   # Download the image (example)
-   wget https://github.com/evilsocket/pwnagotchi/releases/download/v1.5.5/pwnagotchi-raspios-lite-v1.5.5.img.zip
-   unzip pwnagotchi-raspios-lite-v1.5.5.img.zip
+   # Using dd (Linux/macOS)
+   sudo dd if=pwnagotchi-raspios-lite-v1.5.5.img of=/dev/sdX bs=4M status=progress
+   sync
    
-   # Mount the image to extract the rootfs
-   # Find the rootfs partition offset
-   fdisk -l pwnagotchi-raspios-lite-v1.5.5.img
-   
-   # Look for the second partition (rootfs) in the output above
-   # Note the "Start" sector number (e.g., 532480)
-   # Calculate offset: start_sector × 512 = offset in bytes
-   # Example: 532480 × 512 = 272629760 bytes
-   
-   # Mount the rootfs partition - adjust offset based on your fdisk output
-   mkdir -p /tmp/pwnagotchi-rootfs
-   sudo mount -o loop,offset=272629760 pwnagotchi-raspios-lite-v1.5.5.img /tmp/pwnagotchi-rootfs
+   # Or use balenaEtcher, Raspberry Pi Imager, or similar GUI tool
    ```
 
-3. **Install Custom Plugins and Scripts**
+3. **Insert SD Card into Fairphone 3**
 
-   Copy the Fairagotchi-specific files to the rootfs:
+   Power off the phone and insert the microSD card with the flashed Pwnagotchi image.
 
-   ```bash
-   # First, verify the Python version in your image
-   # Check the actual path - it may be python3.9, python3.11, etc.
-   ls /tmp/pwnagotchi-rootfs/usr/local/lib/
-   
-   # Copy display plugin (replaces the original)
-   # Adjust python3.9 to match your Python version (e.g., python3.11)
-   sudo cp plugins/display.py /tmp/pwnagotchi-rootfs/usr/local/lib/python3.9/dist-packages/pwnagotchi/plugins/default/display.py
-   
-   # Copy helper scripts
-   sudo cp scripts/png2fb0.py /tmp/pwnagotchi-rootfs/usr/local/bin/
-   sudo cp scripts/mmcli-gps-tty.py /tmp/pwnagotchi-rootfs/usr/local/sbin/
-   sudo cp scripts/qmi-provision.sh /tmp/pwnagotchi-rootfs/usr/local/sbin/
-   sudo chmod +x /tmp/pwnagotchi-rootfs/usr/local/bin/png2fb0.py
-   sudo chmod +x /tmp/pwnagotchi-rootfs/usr/local/sbin/mmcli-gps-tty.py
-   sudo chmod +x /tmp/pwnagotchi-rootfs/usr/local/sbin/qmi-provision.sh
-   
-   # Copy systemd services
-   sudo cp systemd-services/*.service /tmp/pwnagotchi-rootfs/etc/systemd/system/
-   
-   # Enable services
-   sudo chroot /tmp/pwnagotchi-rootfs /bin/bash -c "systemctl enable display-updater.service gps-qcom.service modem-up.service"
-   ```
+### Post-Boot Configuration
 
-4. **Install Additional Dependencies**
-
-   ```bash
-   # Install ModemManager and GPS tools
-   sudo chroot /tmp/pwnagotchi-rootfs /bin/bash -c "apt-get update && apt-get install -y modemmanager libqmi-utils python3-pil"
-   ```
-
-5. **Configure Pwnagotchi for External Wi-Fi**
-
-   Edit the Pwnagotchi configuration to use your USB Wi-Fi adapter:
-
-   ```bash
-   sudo nano /tmp/pwnagotchi-rootfs/etc/pwnagotchi/config.toml
-   ```
-
-   Update the interface name to match your USB adapter (usually `wlan1`):
-   ```toml
-   main.iface = "wlan1"
-   ```
-
-6. **Unmount and Create the Userdata Image**
-
-   ```bash
-   sudo umount /tmp/pwnagotchi-rootfs
-   
-   # Create a sparse ext4 image from the rootfs directory
-   # Note: This step is optional if you flash directly to the phone
-   # You can also dd the rootfs partition directly to /dev/block/mmcblk0p62 when booted from TWRP
-   ```
-
-### Option 2: Quick Test with Minimal ARM64 Rootfs
-
-For testing purposes, you can use any ARM64 Linux distribution:
-
-```bash
-# Example: Download Alpine Linux ARM64 rootfs
-wget https://dl-cdn.alpinelinux.org/alpine/v3.18/releases/aarch64/alpine-minirootfs-3.18.0-aarch64.tar.gz
-
-# Extract to a directory
-mkdir -p rootfs
-sudo tar -xzf alpine-minirootfs-3.18.0-aarch64.tar.gz -C rootfs/
-
-# The build script will use this rootfs directory automatically
-```
+After the device boots with Fairagotchi, you'll install the necessary services and scripts via SSH. See the [Post-Installation Configuration](#post-installation-configuration) section below for details.
 
 ---
 
@@ -257,19 +184,14 @@ sudo tar -xzf alpine-minirootfs-3.18.0-aarch64.tar.gz -C rootfs/
 
 ### Prerequisites
 
-1. **Unlock Bootloader**
+1. **Update to Latest Official ROM**
+   
+   **IMPORTANT**: Before unlocking the bootloader, ensure your Fairphone 3 is fully updated to the latest official ROM (at least Android 13). This ensures the firmware is up-to-date.
+
+2. **Unlock Bootloader**
    
    Follow the official Fairphone guide:
    https://support.fairphone.com/hc/en-us/articles/360048646311
-
-2. **Install TWRP Recovery** (Optional but recommended)
-   
-   TWRP is useful for backing up, restoring, and managing partitions:
-   
-   ```bash
-   # Boot into fastboot mode (power off, hold Vol Down + Power)
-   fastboot boot resources/twrp.img
-   ```
 
 3. **Boot into Fastboot Mode**
    
@@ -277,23 +199,30 @@ sudo tar -xzf alpine-minirootfs-3.18.0-aarch64.tar.gz -C rootfs/
 
 ### Flashing Process
 
-#### Step 1: Flash LK2ND Bootloader (One-time setup)
+#### Step 1: Flash LK2ND Bootloader and DTBO (One-time setup)
 
-LK2ND is a secondary bootloader that allows booting mainline Linux kernels:
+LK2ND is a secondary bootloader that allows booting mainline Linux kernels. The DTBO (device tree overlay) is flashed here as an empty placeholder - the actual device tree is concatenated to the kernel zImage inside boot.img.
 
+```bash
+# Flash LK2ND bootloader
+fastboot flash boot_a resources/lk2nd.img
+fastboot flash boot_b resources/lk2nd.img
+
+# Flash empty DTBO
+fastboot flash dtbo_a resources/dtbo.img
+fastboot flash dtbo_b resources/dtbo.img
+```
+
+Or use the combined script (which should also include dtbo flashing):
 ```bash
 ./flash_lk2nd.sh
 ```
 
-Or manually:
-```bash
-fastboot flash boot_a resources/lk2nd.img
-fastboot flash boot_b resources/lk2nd.img
-```
+**Note**: The dtbo.img is just an empty placeholder. The real device tree blob (DTB) is concatenated to the zImage inside boot.img during the build process.
 
 Reboot the phone. You should now see the LK2ND boot menu.
 
-#### Step 2: Flash Fairagotchi Images
+#### Step 2: Flash Fairagotchi Kernel and Modules
 
 ```bash
 ./flash.sh
@@ -304,61 +233,22 @@ Or manually:
 fastboot flash boot images/boot.img
 fastboot flash system_a images/modules.img
 fastboot flash system_b images/firmware.img
-fastboot flash dtbo_a resources/dtbo.img
-fastboot flash dtbo_b resources/dtbo.img
 ```
 
 **Partition Layout:**
-- `boot` - Contains the kernel and initramfs
+- `boot` - Contains the kernel (zImage with concatenated DTB) and initramfs
 - `system_a` - Repurposed to hold kernel modules (mounted at `/lib/modules`)
 - `system_b` - Repurposed to hold firmware files (mounted at `/lib/firmware`)
-- `dtbo_a/dtbo_b` - Device tree overlays
-- `userdata` - Root filesystem (Pwnagotchi or other ARM64 Linux)
+- `dtbo_a/dtbo_b` - Empty placeholder (actual DTB is in boot.img)
+- SD card - Root filesystem (Pwnagotchi Raspberry Pi image)
 
-#### Step 3: Flash the Rootfs to Userdata
+#### Step 3: Insert SD Card and Reboot
 
-You have several options:
+1. Power off the phone
+2. Insert the microSD card with the Pwnagotchi image
+3. Power on the phone
 
-**Option A: Using TWRP (Recommended)**
-
-1. Boot into TWRP:
-   ```bash
-   fastboot boot resources/twrp.img
-   ```
-
-2. In TWRP, go to Wipe > Advanced > Select "Data" > Format Data
-
-3. Use ADB to push the rootfs:
-   ```bash
-   # Mount userdata partition
-   adb shell mount /dev/block/mmcblk0p62 /data
-   
-   # Push the rootfs tarball
-   adb push pwnagotchi-rootfs.tar.gz /data/
-   
-   # Extract it
-   adb shell "cd /data && tar -xzf pwnagotchi-rootfs.tar.gz && rm pwnagotchi-rootfs.tar.gz"
-   ```
-
-**Option B: Using dd from Linux (if booted into working system)**
-
-```bash
-# Create ext4 filesystem
-mkfs.ext4 /dev/block/mmcblk0p62
-
-# Mount and extract
-mount /dev/block/mmcblk0p62 /mnt
-tar -xzf /path/to/pwnagotchi-rootfs.tar.gz -C /mnt
-umount /mnt
-```
-
-#### Step 4: Reboot
-
-```bash
-fastboot reboot
-```
-
-The phone should boot into the Fairagotchi system and start Pwnagotchi!
+The phone should boot into Fairagotchi and start Pwnagotchi from the SD card!
 
 ---
 
@@ -366,18 +256,144 @@ The phone should boot into the Fairagotchi system and start Pwnagotchi!
 
 ### Accessing the Device
 
-1. **Via USB Network**
+1. **Via USB to Ethernet Adapter**
    
-   Connect the phone via USB. It should appear as a USB ethernet device:
+   Connect a USB to Ethernet adapter to the phone using a USB-OTG cable, then connect an Ethernet cable from the adapter to your computer or network.
+   
+   Once connected, SSH into the device:
    
    ```bash
    ssh pi@10.0.0.2
    # Default password: raspberry
    ```
 
+   **Note**: USB-C role switching for USB ethernet (like the original Pwnagotchi) will be implemented in the future.
+
 2. **Via Serial Console** (if USB networking doesn't work)
    
    You may need a USB serial adapter connected to the phone's debugging pins.
+
+### Installing Fairagotchi Services and Scripts
+
+After you've successfully booted into Pwnagotchi and can SSH into the device, install the Fairagotchi-specific components:
+
+1. **Copy Files to the Device**
+
+   From your build machine, copy the necessary files:
+
+   ```bash
+   # Copy helper scripts
+   scp scripts/png2fb0.py pi@10.0.0.2:/tmp/
+   scp scripts/mmcli-gps-tty.py pi@10.0.0.2:/tmp/
+   scp scripts/qmi-provision.sh pi@10.0.0.2:/tmp/
+   
+   # Copy systemd services
+   scp systemd-services/*.service pi@10.0.0.2:/tmp/
+   
+   # Copy display plugin
+   scp plugins/display.py pi@10.0.0.2:/tmp/
+   ```
+
+2. **Install on the Device**
+
+   SSH into the device and run:
+
+   ```bash
+   # Move scripts to proper locations
+   sudo mv /tmp/png2fb0.py /usr/local/bin/
+   sudo mv /tmp/mmcli-gps-tty.py /usr/local/sbin/
+   sudo mv /tmp/qmi-provision.sh /usr/local/sbin/
+   sudo chmod +x /usr/local/bin/png2fb0.py
+   sudo chmod +x /usr/local/sbin/mmcli-gps-tty.py
+   sudo chmod +x /usr/local/sbin/qmi-provision.sh
+   
+   # Install systemd services
+   sudo mv /tmp/*.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable display-updater.service gps-qcom.service modem-up.service
+   sudo systemctl start display-updater.service gps-qcom.service modem-up.service
+   ```
+
+3. **Replace Display Plugin**
+
+   Find the location of the display.py file:
+
+   ```bash
+   find /home/pi -name "display.py" 2>/dev/null | grep pwnagotchi
+   ```
+
+   This will show you the path, typically something like:
+   `/home/pi/.local/lib/python3.9/site-packages/pwnagotchi/ui/display.py`
+
+   Replace it with the Fairagotchi version:
+
+   ```bash
+   # Backup the original
+   sudo cp /path/to/original/display.py /path/to/original/display.py.backup
+   
+   # Replace with Fairagotchi version
+   sudo cp /tmp/display.py /path/to/original/display.py
+   ```
+
+4. **Disable Automatic Pwnagotchi Updates**
+
+   To prevent automatic updates from overwriting your custom display.py:
+
+   ```bash
+   sudo systemctl disable pwnagotchi-auto-update
+   sudo systemctl stop pwnagotchi-auto-update
+   ```
+
+   Or edit the Pwnagotchi configuration:
+
+   ```bash
+   sudo nano /etc/pwnagotchi/config.toml
+   ```
+
+   Add or modify:
+   ```toml
+   main.update.enabled = false
+   ```
+
+   **Note**: A separate display plugin that doesn't require modifying Pwnagotchi itself will be developed in the future.
+
+5. **Install Additional Dependencies**
+
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y modemmanager libqmi-utils python3-pil
+   ```
+
+6. **Reboot**
+
+   ```bash
+   sudo reboot
+   ```
+
+### Configure Pwnagotchi for External Wi-Fi
+
+Edit the Pwnagotchi configuration to use your RTL8821CU USB Wi-Fi adapter:
+
+```bash
+sudo nano /etc/pwnagotchi/config.toml
+```
+
+Update the interface name to match your USB adapter (usually `wlan1`):
+```toml
+main.iface = "wlan1"
+```
+
+### Configure External USB Wi-Fi Adapter
+
+1. Plug in your RTL8821CU USB Wi-Fi adapter (e.g., EP119) via OTG cable
+2. Verify it's detected:
+   ```bash
+   ip link show
+   # Should show wlan1 or similar
+   lsusb
+   # Should show your RTL8821CU adapter
+   ```
+3. The firmware for RTL8821CU is included in this project
 
 ### Configure Mobile Data (Optional)
 
@@ -395,17 +411,12 @@ If you want to use the internal modem for internet connectivity:
 GPS requires a SIM card to be inserted (due to Qualcomm firmware requirements).
 
 1. The `gps-qcom.service` exposes GPS as `/dev/ttyUSB9`
-2. Configure Pwnagotchi to use this GPS device in `/etc/pwnagotchi/config.toml`
-
-### Configure External USB Wi-Fi Adapter
-
-1. Plug in your USB Wi-Fi adapter via OTG cable
-2. Verify it's detected:
-   ```bash
-   ip link show
-   # Should show wlan1 or similar
+2. Configure Pwnagotchi to use this GPS device in `/etc/pwnagotchi/config.toml`:
+   ```toml
+   main.plugins.gps.enabled = true
+   main.plugins.gps.device = "/dev/ttyUSB9"
+   main.plugins.gps.speed = 19200
    ```
-3. Ensure Pwnagotchi is configured to use the correct interface (`wlan1`)
 
 ### Display Updates
 
@@ -416,7 +427,7 @@ The `png2fb0.py` script (run by `display-updater.service`) continuously pushes t
 
 ## Using with Other ARM64 Linux Distributions
 
-This project isn't limited to Pwnagotchi! You can use it to boot any ARM64 Linux distribution on the Fairphone 3.
+This project isn't limited to Pwnagotchi! You can use it to boot any ARM64 Linux distribution from the SD card on the Fairphone 3.
 
 ### Supported Distributions
 
@@ -433,22 +444,19 @@ This project isn't limited to Pwnagotchi! You can use it to boot any ARM64 Linux
 1. **Build the kernel and images** as described above
 2. **Flash the boot images** (boot, modules, firmware) using the same process
 3. **Prepare your chosen rootfs:**
-   - Download or build the ARM64 rootfs for your distribution
-   - Extract to a directory or create an ext4 image
-4. **Flash the rootfs to userdata** using TWRP or dd
-5. **Configure init system:**
-   - Ensure the init system expects to start from `/dev/mmcblk0p62`
-   - The initramfs will mount this as root
-6. **Reboot** and enjoy your chosen Linux distribution!
+   - Flash your ARM64 Linux distribution image to a microSD card
+   - Or use a pre-configured SD card image for your chosen distribution
+4. **Insert the SD card** into the Fairphone 3
+5. **Reboot** and enjoy your chosen Linux distribution!
 
 ### Example: PostmarketOS
 
 ```bash
-# Download PostmarketOS rootfs
-wget https://images.postmarketos.org/...
+# Download PostmarketOS image for your preferred UI
+# Flash it to SD card
+sudo dd if=postmarketos-fairphone-fp3.img of=/dev/sdX bs=4M status=progress
 
-# Flash as described above
-# Configure device-specific files (display, modem, etc.)
+# Insert into phone and boot
 ```
 
 ---
@@ -471,8 +479,9 @@ wget https://images.postmarketos.org/...
 
 - Check USB OTG connection
 - Verify adapter is supported by the kernel (check `lsusb` and `dmesg`)
+- **Recommended**: Use an RTL8821CU based adapter (e.g., EP119) - firmware is included in this project
 - Ensure the adapter supports monitor mode
-- Try different USB Wi-Fi adapters (see compatibility list)
+- Check if the driver is loaded: `lsmod | grep rtl`
 
 ### Modem not working
 
