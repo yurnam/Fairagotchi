@@ -505,14 +505,14 @@ Block incoming connections to Pwnagotchi ports:
 # Install iptables if not present
 sudo apt-get install -y iptables iptables-persistent
 
+# IMPORTANT: Allow established connections first (responses to your outgoing requests)
+sudo iptables -A INPUT -i wwan0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
 # Block incoming connections on Pwnagotchi web interface (port 8080)
 sudo iptables -A INPUT -i wwan0 -p tcp --dport 8080 -j DROP
 
 # Block incoming connections on Pwnagotchi API (port 8081)
 sudo iptables -A INPUT -i wwan0 -p tcp --dport 8081 -j DROP
-
-# Allow established connections (responses to your outgoing requests)
-sudo iptables -A INPUT -i wwan0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # Optional: Block all other incoming connections on mobile interface
 # sudo iptables -A INPUT -i wwan0 -j DROP
