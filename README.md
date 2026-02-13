@@ -361,12 +361,51 @@ After you've successfully booted into Pwnagotchi and can SSH into the device, in
 
 5. **Install Additional Dependencies**
 
+   Install the required packages for modem, GPS, and other functionality:
+
    ```bash
    sudo apt-get update
-   sudo apt-get install -y modemmanager libqmi-utils python3-pil
+   sudo apt-get install -y \
+       modemmanager \
+       libqmi-utils \
+       rmtfs \
+       python3-pil \
+       linux-firmware \
+       network-manager
    ```
 
-6. **Reboot**
+   **Package explanations:**
+   - `modemmanager` - Manages the Qualcomm modem
+   - `libqmi-utils` - QMI protocol utilities for modem communication (includes `qmicli`)
+   - `rmtfs` - Remote filesystem service for modem firmware access
+   - `python3-pil` - Python Imaging Library for display rendering
+   - `linux-firmware` - Must be reinstalled as the init script removes original firmware from rootfs
+   - `network-manager` - For managing network connections (includes `nmcli`)
+
+   **Why reinstall linux-firmware?**
+   The initramfs script (`/init`) removes `/lib/firmware` from the rootfs and replaces it with a mount from the `system_b` partition. This ensures the kernel uses the firmware included in this project, but you may want additional firmware packages for other hardware.
+
+6. **Customize QMI Provisioning AID (if needed)**
+
+   The modem provisioning service uses a specific AID (Application Identifier) for the SIM card. The default AID in `/usr/local/sbin/qmi-provision.sh` is:
+
+   ```
+   AID="A0:00:00:00:87:10:02:FF:49:94:20:89:03:10:00:00"
+   ```
+
+   This works for most SIM cards, but if your modem doesn't initialize correctly, you may need to find and use the correct AID for your SIM card. You can list available AIDs with:
+
+   ```bash
+   qmicli -d qrtr://0 --uim-get-card-status
+   ```
+
+   If you need to change it, edit the script:
+
+   ```bash
+   sudo nano /usr/local/sbin/qmi-provision.sh
+   ```
+
+7. **Reboot**
 
    ```bash
    sudo reboot
@@ -401,19 +440,119 @@ main.iface = "wlan1"
 
 If you want to use the internal modem for internet connectivity:
 
-1. Insert a SIM card
-2. The `modem-up.service` should automatically provision the modem
-3. Use ModemManager to configure APN:
+1. **Insert a SIM card** into the phone
+
+2. **Wait for modem initialization**
+   
+   The `modem-up.service` should automatically provision the modem. Check status:
+   
    ```bash
-   mmcli -m 0 --simple-connect="apn=your-apn-here"
+   systemctl status modem-up.service
+   mmcli -L  # List modems
+   mmcli -m 0  # Check modem 0 status
    ```
+
+3. **Configure APN with NetworkManager**
+
+   Use `nmcli` to create a connection profile for your mobile provider:
+
+   ```bash
+   # Example for a generic provider
+   sudo nmcli connection add \
+       type gsm \
+       ifname '*' \
+       con-name mobile \
+       apn "your-apn-here" \
+       connection.autoconnect yes
+   
+   # For some providers, you may also need username/password:
+   # sudo nmcli connection modify mobile gsm.username "your-username"
+   # sudo nmcli connection modify mobile gsm.password "your-password"
+   ```
+
+   **Common APN examples:**
+   - T-Mobile US: `fast.t-mobile.com`
+   - AT&T US: `phone`
+   - Verizon US: `vzwinternet`
+   - Vodafone: `internet`
+   
+   Contact your mobile provider for the correct APN settings.
+
+4. **Activate the connection**
+
+   ```bash
+   sudo nmcli connection up mobile
+   ```
+
+   The connection will now automatically connect on boot thanks to `connection.autoconnect yes`.
+
+5. **Verify connectivity**
+
+   ```bash
+   ip addr show wwan0  # Check if interface has an IP
+   ping -I wwan0 8.8.8.8  # Test connectivity
+   ```
+
+### Security Warning: Public IP Access
+
+**IMPORTANT**: When using mobile data, your device may be directly accessible via a public IP address. This is a security risk, especially for Pwnagotchi which exposes services on various ports.
+
+**Recommended: Configure firewall rules**
+
+Block incoming connections to Pwnagotchi ports:
+
+```bash
+# Install iptables if not present
+sudo apt-get install -y iptables iptables-persistent
+
+# Block incoming connections on Pwnagotchi web interface (port 8080)
+sudo iptables -A INPUT -i wwan0 -p tcp --dport 8080 -j DROP
+
+# Block incoming connections on Pwnagotchi API (port 8081)
+sudo iptables -A INPUT -i wwan0 -p tcp --dport 8081 -j DROP
+
+# Allow established connections (responses to your outgoing requests)
+sudo iptables -A INPUT -i wwan0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Optional: Block all other incoming connections on mobile interface
+# sudo iptables -A INPUT -i wwan0 -j DROP
+
+# Save rules so they persist across reboots
+sudo netfilter-persistent save
+```
+
+Alternatively, configure Pwnagotchi to only listen on the USB interface (`usb0`) instead of all interfaces.
 
 ### Configure GPS (Optional)
 
 GPS requires a SIM card to be inserted (due to Qualcomm firmware requirements).
 
-1. The `gps-qcom.service` exposes GPS as `/dev/ttyUSB9`
-2. Configure Pwnagotchi to use this GPS device in `/etc/pwnagotchi/config.toml`:
+**How it works**: The `gps-qcom.service` runs the `mmcli-gps-tty.py` script, which:
+- Uses Python's `pty` module to create a pseudo-terminal pair
+- Reads NMEA sentences from ModemManager (`mmcli -m any --location-get`)
+- Writes them to a PTY, creating a virtual serial device
+- Creates a symlink `/dev/ttyUSB9` -> `/dev/pts/X` for compatibility
+
+**Configuration steps:**
+
+1. Ensure the GPS service is running:
+   ```bash
+   systemctl status gps-qcom.service
+   ```
+
+2. Verify the virtual serial device exists:
+   ```bash
+   ls -la /dev/ttyUSB9
+   # Should show: /dev/ttyUSB9 -> /dev/pts/X
+   ```
+
+3. Test GPS output:
+   ```bash
+   cat /dev/ttyUSB9
+   # Should show NMEA sentences like $GPGGA, $GPRMC, etc.
+   ```
+
+4. Configure Pwnagotchi to use the GPS device in `/etc/pwnagotchi/config.toml`:
    ```toml
    main.plugins.gps.enabled = true
    main.plugins.gps.device = "/dev/ttyUSB9"
