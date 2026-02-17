@@ -437,7 +437,14 @@
 
 &usb3 {
 	status = "okay";
+
+	/*
+	 * QUICK FIX: Force permanent host mode.
+	 * This avoids the "charger connected => device mode" trap.
+	 */
+	dr_mode = "host";
 };
+
 
 &usb_dwc3_hs {
 	remote-endpoint = <&pmi632_hs_in>;
