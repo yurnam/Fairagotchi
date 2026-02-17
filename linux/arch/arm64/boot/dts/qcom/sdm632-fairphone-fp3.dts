@@ -199,12 +199,17 @@
 	connector {
 		compatible = "usb-c-connector";
 
+		/*
+		 * Keep this dual so the PMIC can still detect partners,
+		 * but DO NOT disable PD here. Many docks need PD to allow
+		 * charge + data host combinations.
+		 */
 		power-role = "dual";
 		data-role = "dual";
 		self-powered;
 
 		typec-power-opmode = "default";
-		pd-disable;
+		/* IMPORTANT: remove pd-disable; */
 
 		port {
 			pmi632_hs_in: endpoint {
@@ -213,6 +218,7 @@
 		};
 	};
 };
+
 
 &pmi632_vbus {
 	regulator-min-microamp = <500000>;
